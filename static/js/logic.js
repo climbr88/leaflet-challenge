@@ -1,117 +1,103 @@
+// Store our API endpoint inside queryUrl
+var queryUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
 
-
-  // Store API query variables
-  var url = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_month.geojson";
-  
-
-  
-
-
-// function to determine marker size based on magnitude
-function markerSize(magnitude) {
-    return magnitude * 10;
-}
-
-// function to return the color based on magnitude
-function markerColor(magnitude) {
-  if (magnitude > 5.0) {
-    return 'red'
-  } else if (magnitude > 4.0) {
-    return 'orange'
-  } else if (magnitude > 3.0) {
-    return 'yellow'
-  } else {
-    return 'pink'
-  }
-}
-
-
-
-// D3 to get json data
-d3.json(url, function(response) {
-  
-  var earthquakes = L.geoJSON(response.features, {
-    onEachFeature : addPopup,
-    pointToLayer: addMarker
-  });
-
-// call function to create map
-  createMap(earthquakes);
-
+// Perform a GET request to the query URL
+d3.json(queryUrl, function (response) {
+    // Once we get a response, send the data.Features object to the createFeatures function
+    createFeatures(response.features);
 });
 
-function addMarker(feature, location) {
-  var options = {
-    stroke: false,
-    color: markerColor(feature.properties.mag),
-    fillColor: markerColor(feature.properties.mag),
-    radius: markerSize(feature.properties.mag)
-  }
+function createFeatures(earthquakeData) {
+// Define a function we want to run once for each feature in the features array
+    // Give each feature a popup describing the place and time of the earthquake
+    function onEachfeature(features, layer) {
+        layer.bindPopup("<h3>" + features.properties.place + "</h3><hr><p>" + new Date(features.properties.time) + "</p>");
+    }
 
-  return L.circleMarker(location, options);
+    var earthquakes = L.geoJSON(earthquakeData, {
+        onEachFeature: onEachfeature,
+        pointToLayer: function (features, latlng) {
+            var geoJSONMarker = {
+                radius: markerSize(features.properties.mag),
+                fillColor: getColor(features.properties.mag),
+                color: "white",
+                weight: 0.5,
+                opacity: 0.5,
+                fillOpacity: 0.8
+            };
 
-}
-
-// Define function for map features
-function addPopup(feature, layer) {
-    
-    return layer.bindPopup(`<h3> ${feature.properties.place} </h3> <hr> <h4>Magnitude: ${feature.properties.mag} </h4>`);
-}
-
+            return L.circleMarker(latlng, geoJSONMarker);
+        },
+    })
+    // Sending our earthquakes layer to the createMap function
+    createMap(earthquakes);
+};
 
 function createMap(earthquakes) {
-
-    // Define streetmap layer
-    var streetMap = L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+    var streetmap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+      attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/\">OpenStreetMap</a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
       maxZoom: 18,
-      id: "mapbox.streets",
+      id: "light-v10",
       accessToken: API_KEY
     });
-  
-    // var darkmap = L.tileLayer("https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}", {
-    //   maxZoom: 18,
-    //   id: "mapbox.dark",
-    //   accessToken: API_KEY
-    // });
-  
-    // Define a baseMaps object to hold our base layers
+
+   
+    //Define a baseMaps object to hold our base layers
     var baseMaps = {
-      "Street Map": streetMap,
-      
+        "Street Map": streetmap
+        // "Dark Map": darkmap
     };
-  
+
     // Create overlay object to hold our overlay layer
     var overlayMaps = {
-      Earthquakes: earthquakes
+        "Earthquakes": earthquakes
     };
-  
-    // Create our map
-    var myMap = L.map("map-id", {
-      center: [37.09, -95.71],
-      zoom: 10,
-      layers: [streetMap, earthquakes]
+
+    // Create our map, giving it the streetmap and earthquakes layers to display on load
+    var myMap = L.map("map", {
+        center: [27.503, -99.507],
+        zoom: 3,
+        layers: [streetmap, earthquakes]
     });
-  
-    // creating the legend
-    var legend = L.control({position: 'bottomright'});
 
-    // add legend to map
-    legend.onAdd = function () {
     
-        var div = L.DomUtil.create('div', 'info legend')
-        
-        div.innerHTML = "<h3>Magnitude Legend</h3><table><tr><th>>= 5</th><td>Red</td></tr><tr><th>>= 4</th><td>Orange</td></tr><tr><th>>= 3</th><td>Yellow</td></tr><tr><th>< 2</th><td>Pink</td></tr></table>";
-
-        return div;
-    };
-    
-    legend.addTo(myMap);
-
-    // Create a layer control
-    // Pass in our baseMaps and overlayMaps
-    // Add the layer control to the map
     L.control.layers(baseMaps, overlayMaps, {
-      collapsed: false
+        collapsed: false
     }).addTo(myMap);
 
-  }
+    
+    const legend = L.control({ position: 'bottomright' });
+    console.log(legend)
+    legend.onAdd = function(map) {
+        var div = L.DomUtil.create('div', 'legend');
+         
+        div.innerHTML += "<h4>MAGNITUDE</h4>";    
+        div.innerHTML += '<i style="background: #663399"></i><span>>=5.0</span><br>';
+        div.innerHTML += '<i style="background: #9370DB"></i><span>>=4.0</span><br>';
+        div.innerHTML += '<i style="background: #EE82EE"></i><span>>=3.0</span><br>';
+        div.innerHTML += '<i style="background: #D88FD8"></i><span>>=2.0</span><br>';
+        div.innerHTML += '<i style="background: #E6E6FA"></i><span>< 2.0</span><br>';
+        
+          return div; 
+        
+        };
+        legend.addTo(myMap);    
+      };
+
+
+
+
+function getColor(d) {
+  return d > 5 ? '#663399':
+         d > 4 ? '#9370DB':
+         d > 3 ? '#EE82EE': 
+         d > 2 ? '#DDA0DD':
+         d < 2 ? '#D8BFD8':
+                 '#E6E6FA';
+  };
+     
+    
+
+function markerSize(mag) {
+    return mag * 3
+};
